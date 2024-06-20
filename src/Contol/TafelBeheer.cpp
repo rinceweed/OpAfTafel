@@ -1,8 +1,10 @@
 /*--[ Include Files ]------------------------------------------------------------------------------------------------------------*/
 #include <Arduino.h>
+#include <EEPROM.h>
 #include "Tsm_i.h"
 #include "Button.h"
 #include "Timer.h"
+#include "EepromMap.h"
 
 /*--[ Literals ]-----------------------------------------------------------------------------------------------------------------*/
 typedef enum TafelStates
@@ -13,6 +15,7 @@ typedef enum TafelStates
   Done,
   Program,
   ProgramUpDown,
+  HomeTafel,
   MAX_TAFEL_STATES
 }TAFEL_STATES;
 
@@ -29,6 +32,8 @@ typedef enum TafelRigtings
 
 /*--[ Data ]---------------------------------------------------------------------------------------------------------------------*/
 bool LED_STATE = true;
+uint32_t HuidigeTafelPosisie;
+
 PinDebounce ButtonDebounce[KEY_MAX] =
 {
   { button : KEY_ADJUST, buttonState : false,  currentButtonState : false, debounceTime : 20},
@@ -71,6 +76,30 @@ SM_MACRO_RULE_LIST(Debounce) =
 {
   SM_MACRO_NAME_RULE(Debounce, 0), NULL
 };
+
+/*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_RULE_LIST(Done) =
+{
+  NULL
+};
+
+/*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_RULE_LIST(Program) =
+{
+  NULL
+};
+
+/*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_RULE_LIST(ProgramUpDown) =
+{
+  NULL
+};
+
+/*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_RULE_LIST(HomeTafel) =
+{
+  NULL
+};
 /*==[ PUBLIC FUNCTIONS ]=========================================================================================================*/
 
 static Tsm_SM Tafel_SM;
@@ -84,6 +113,10 @@ static Tsm_States Tafel_States[MAX_TAFEL_STATES] =
   {SM_MACRO_NAME_OPEN(Idle), SM_MACRO_NAME_STATE(Idle), SM_MACRO_RULES(Idle), NULL},
   {SM_MACRO_NAME_OPEN(MoveUpDown), SM_MACRO_NAME_STATE(MoveUpDown), SM_MACRO_RULES(MoveUpDown), NULL},
   {SM_MACRO_NAME_OPEN(Debounce), NULL, SM_MACRO_RULES(Debounce), NULL},
+  {NULL, NULL, SM_MACRO_RULES(Done), NULL},
+  {NULL, NULL, SM_MACRO_RULES(Program), NULL},
+  {NULL, NULL, SM_MACRO_RULES(ProgramUpDown), NULL},
+  {NULL, NULL, SM_MACRO_RULES(HomeTafel), NULL}
 };
 
 /* =========================================================================
@@ -100,7 +133,11 @@ void TafelBeheerInit()
   {
     pinMode(ButtonDebounce[i].button, INPUT);
   }
-  Tsm_Create(&Tafel_SM, Tafel_States, &DebounceHandle, Idle, MAX_TAFEL_STATES);
+
+  uint32_t start = IsTafelHomed() == HOMED ? Idle: HomeTafel;
+  HuidigeTafelPosisie = KryTafelPosisie();
+
+  Tsm_Create(&Tafel_SM, Tafel_States, &DebounceHandle, start, MAX_TAFEL_STATES);
   return;
 }
 
