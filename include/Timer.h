@@ -11,6 +11,7 @@ enum Timers
   TIME_KEYPRESS = 0,
   TIME_LED_FAST,
   TIME_LED_SLOW,
+  TIME_MOTOR_STEP,
   MAX_TIMERS
 };
 

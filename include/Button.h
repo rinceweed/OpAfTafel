@@ -15,12 +15,13 @@ typedef struct PinDebouncing
   bool    buttonState;
   bool    currentButtonState;
   unsigned long debounceTime;
-} PinDebounce;
+} ButtonPinDebounce;
 
 /*--[ Constants ]----------------------------------------------------------------------------------------------------------------*/
 
 /*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
 void ButtonInitialise();
-void CheckButtonPress(PinDebounce *fPinIn);
+ButtonPinDebounce * ButtonOnKey(enum KEYS key);
+void CheckButtonPress();
 /*===============================================================================================================================*/
 #endif

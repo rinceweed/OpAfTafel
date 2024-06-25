@@ -6,14 +6,59 @@
 
 /*--[ Types ]--------------------------------------------------------------------------------------------------------------------*/
 
+/*--[ Data ]---------------------------------------------------------------------------------------------------------------------*/
+ButtonPinDebounce ButtonDebounce[] = //wont work, keys need to be in order
+{
+  { button : KEY_ADJUST, buttonState : false,  currentButtonState : false, debounceTime : 20},
+  { button : KEY_LINKS, buttonState : false,  currentButtonState : false, debounceTime : 20},
+  { button : KEY_REGS, buttonState : false,  currentButtonState : false, debounceTime : 20},
+  { button : KEY_OP, buttonState : false,  currentButtonState : false, debounceTime : 20},
+  { button : KEY_AF, buttonState : false,  currentButtonState : false, debounceTime : 20},
+  { button : KEY_IN, buttonState : false,  currentButtonState : false, debounceTime : 20},
+  { button : KEY_RESET, buttonState : false,  currentButtonState : false, debounceTime : 20}
+};
+
+uint32_t ButtonDebounceLookupSize = sizeof(ButtonDebounce)/sizeof(ButtonPinDebounce);
+
+/*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
+void CheckButtonPress(ButtonPinDebounce *fPinIn);
+
+/* ==============================================================================================================================*/
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
 void ButtonInitialise()
 {
   ConfigureTimer(TIME_KEYPRESS, 0.01);
+  for (uint8_t i = 0; i < ButtonDebounceLookupSize; i++)
+  {
+    pinMode(ButtonDebounce[i].button, INPUT);
+  }
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
-void CheckButtonPress(PinDebounce *fPinIn)
+ButtonPinDebounce * ButtonOnKey(enum KEYS key)
+{
+  for (uint8_t index = 0; (index < ButtonDebounceLookupSize); index++)
+  {
+    if (ButtonDebounce[index].button == key)
+    {
+      return &ButtonDebounce[index];
+    }
+  }
+  //not nice but ok
+  return nullptr;
+}
+
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+void CheckButtonPress()
+{
+  for (uint8_t i = 0; i < ButtonDebounceLookupSize; i++)
+  {
+    CheckButtonPress(&(ButtonDebounce[i]));
+  }
+}
+
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+void CheckButtonPress(ButtonPinDebounce *fPinIn)
 {
   // read the state of the switch into a local variable:
   bool value = digitalRead(fPinIn->button) ? true : false;

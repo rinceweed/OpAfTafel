@@ -57,6 +57,13 @@ uint32_t KryTafelPosisie()
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+void StoorTafelPosisie(uint32_t posisie)
+{
+  EEPROM.put(TAFEL_POSISIE, posisie);
+  return;
+}
+
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
 uint8_t KryGekosePosisieIndex()
 {
   uint8_t e = EEPROM.read(GEKOSE_POSISIE_INDEX);
