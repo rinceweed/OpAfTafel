@@ -15,7 +15,8 @@ ButtonPinDebounce ButtonDebounce[] = //wont work, keys need to be in order
   { button : KEY_OP, buttonState : false,  currentButtonState : false, debounceTime : 20},
   { button : KEY_AF, buttonState : false,  currentButtonState : false, debounceTime : 20},
   { button : KEY_IN, buttonState : false,  currentButtonState : false, debounceTime : 20},
-  { button : KEY_RESET, buttonState : false,  currentButtonState : false, debounceTime : 20}
+  { button : KEY_RESET, buttonState : false,  currentButtonState : false, debounceTime : 20},
+  { button : KEY_HOME, buttonState : false,  currentButtonState : false, debounceTime : 20},
 };
 
 uint32_t ButtonDebounceLookupSize = sizeof(ButtonDebounce)/sizeof(ButtonPinDebounce);
@@ -61,11 +62,16 @@ void CheckButtonPress()
 void CheckButtonPress(ButtonPinDebounce *fPinIn)
 {
   // read the state of the switch into a local variable:
-  bool value = digitalRead(fPinIn->button) ? true : false;
+  int pinAValue = analogRead(fPinIn->button);
+  int pinDValue = digitalRead(fPinIn->button);
+  bool value = digitalRead(fPinIn->button) > 3 ? true : false;
 
-  // Serial.print(F("Pin "));
-  // Serial.print(fPinIn->button);
-  // Serial.println(value);
+   Serial.print(F("Pin "));
+   Serial.print(fPinIn->button);
+   Serial.print(" :A ");
+   Serial.print(pinAValue);
+   Serial.print(" :D ");
+   Serial.println(pinDValue);
 
   // check to see if you just pressed the button
   // (i.e. the input went from LOW to HIGH), and you've waited long enough
@@ -95,9 +101,10 @@ void CheckButtonPress(ButtonPinDebounce *fPinIn)
     // whatever the reading is at, it's been there for longer than the debounce
     // delay, so take it as the actual current state:
     fPinIn->buttonState = value;
-    // Serial.print(F("Button "));
-    // Serial.print(fPinIn->button);
-    // Serial.println(fPinIn->buttonState);
+    //  Serial.print(F("Button "));
+    //  Serial.print(fPinIn->button);
+    //  Serial.print(" : ");
+    //  Serial.println(fPinIn->buttonState);
     
     // snprintf(_snbuffer, sizeof(_snbuffer), "Raw: x: %i, y: %i, z: %i", *x, *y, *z);
     // Serial.println(_snbuffer);

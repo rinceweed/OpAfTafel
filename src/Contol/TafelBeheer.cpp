@@ -11,7 +11,8 @@ typedef enum TafelStates
 {
   Idle,
   SelectPosisie,
-  MoveUpDown,
+  TableToPosisie,
+  TableUpDown,
   Debounce,
   Done,
   Program,
@@ -52,9 +53,11 @@ static DebounceNavigate DebounceHandle;
 SM_MACRO_PROTO_OPEN(Idle);
 SM_MACRO_PROTO_STATE(Idle);
 SM_MACRO_PROTO_RULE(Idle, 0);
+SM_MACRO_PROTO_RULE(Idle, 1);
+SM_MACRO_PROTO_RULE(Idle, 2);
 SM_MACRO_RULE_LIST(Idle) =
 {
-  SM_MACRO_NAME_RULE(Idle, 0), NULL
+  SM_MACRO_NAME_RULE(Idle, 0), SM_MACRO_NAME_RULE(Idle, 1), SM_MACRO_NAME_RULE(Idle, 2), NULL
 };
  
 /*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
@@ -64,13 +67,23 @@ SM_MACRO_RULE_LIST(SelectPosisie) =
 };
 
 /*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
-SM_MACRO_PROTO_OPEN(MoveUpDown);
-SM_MACRO_PROTO_STATE(MoveUpDown);
-SM_MACRO_PROTO_CLOSE(MoveUpDown);
-SM_MACRO_PROTO_RULE(MoveUpDown, 0);
-SM_MACRO_RULE_LIST(MoveUpDown) =
+SM_MACRO_PROTO_OPEN(TableToPosisie);
+SM_MACRO_PROTO_STATE(TableToPosisie);
+SM_MACRO_PROTO_CLOSE(TableToPosisie);
+SM_MACRO_PROTO_RULE(TableToPosisie, 0);
+SM_MACRO_RULE_LIST(TableToPosisie) =
 {
-  SM_MACRO_NAME_RULE(MoveUpDown, 0), NULL
+  SM_MACRO_NAME_RULE(TableToPosisie, 0), NULL
+};
+
+/*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_PROTO_OPEN(TableUpDown);
+SM_MACRO_PROTO_STATE(TableUpDown);
+SM_MACRO_PROTO_CLOSE(TableUpDown);
+SM_MACRO_PROTO_RULE(TableUpDown, 0);
+SM_MACRO_RULE_LIST(TableUpDown) =
+{
+  SM_MACRO_NAME_RULE(TableUpDown, 0), NULL
 };
 
 /*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
@@ -100,9 +113,13 @@ SM_MACRO_RULE_LIST(ProgramUpDown) =
 };
 
 /*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_PROTO_OPEN(HomeTafel);
+SM_MACRO_PROTO_STATE(HomeTafel);
+SM_MACRO_PROTO_CLOSE(HomeTafel);
+SM_MACRO_PROTO_RULE(HomeTafel, 0);
 SM_MACRO_RULE_LIST(HomeTafel) =
 {
-  NULL
+  SM_MACRO_NAME_RULE(HomeTafel, 0), NULL
 };
 
 /*==[ SM Data ]==================================================================================================================*/
@@ -110,12 +127,13 @@ static Tsm_States Tafel_States[MAX_TAFEL_STATES] =
 {
   {SM_MACRO_NAME_OPEN(Idle), SM_MACRO_NAME_STATE(Idle), SM_MACRO_RULES(Idle), NULL},
   {NULL, NULL, SM_MACRO_RULES(SelectPosisie), NULL},
-  {SM_MACRO_NAME_OPEN(MoveUpDown), SM_MACRO_NAME_STATE(MoveUpDown), SM_MACRO_RULES(MoveUpDown), SM_MACRO_NAME_CLOSE(MoveUpDown)},
+  {SM_MACRO_NAME_OPEN(TableToPosisie), SM_MACRO_NAME_STATE(TableToPosisie), SM_MACRO_RULES(TableToPosisie), SM_MACRO_NAME_CLOSE(TableToPosisie)},
+  {SM_MACRO_NAME_OPEN(TableUpDown), SM_MACRO_NAME_STATE(TableUpDown), SM_MACRO_RULES(TableUpDown), SM_MACRO_NAME_CLOSE(TableUpDown)},
   {SM_MACRO_NAME_OPEN(Debounce), NULL, SM_MACRO_RULES(Debounce), NULL},
   {NULL, NULL, SM_MACRO_RULES(Done), NULL},
   {NULL, NULL, SM_MACRO_RULES(Program), NULL},
   {NULL, NULL, SM_MACRO_RULES(ProgramUpDown), NULL},
-  {NULL, NULL, SM_MACRO_RULES(HomeTafel), NULL}
+  {SM_MACRO_NAME_OPEN(HomeTafel), SM_MACRO_NAME_STATE(HomeTafel), SM_MACRO_RULES(HomeTafel), SM_MACRO_NAME_CLOSE(HomeTafel)}
 };
 
 /* ==============================================================================================================================*/
@@ -150,7 +168,7 @@ void TafelBeheerSM()
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
 SM_MACRO_PROTO_OPEN(Idle)
 {
-  Serial.println(F("Idle "));
+  Serial.println(F("Idle"));
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
@@ -174,17 +192,47 @@ SM_MACRO_PROTO_RULE(Idle, 0)
 
   if (current_button_ptr->buttonState == true)
   {
-    Serial.println(F("Idle -> MoveUpDown"));
-    *pstate = Debounce;
-    ((DebounceNavigate*)pI)->goOn = MoveUpDown;
+    Serial.println(F("Idle -> TableToPosisie"));
+    ((DebounceNavigate*)pI)->goOn = TableToPosisie;
     ((DebounceNavigate*)pI)->pressedButton = current_button_ptr;
+    *pstate = Debounce;
   }
 }
-// MoveUpDown ====================================================================================================================
+
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
-SM_MACRO_PROTO_OPEN(MoveUpDown)
+SM_MACRO_PROTO_RULE(Idle, 1)
 {
-  Serial.println(F("MoveUpDown "));
+  ButtonPinDebounce *current_button_ptr = ButtonOnKey(KEY_OP);
+
+  if (current_button_ptr->buttonState == true)
+  {
+    Serial.println(F("Idle -> Up -> TableUpDown"));
+    StepRigting = Opwaarts;
+    ((DebounceNavigate*)pI)->goOn = TableUpDown;
+    ((DebounceNavigate*)pI)->pressedButton = current_button_ptr;
+    *pstate = TableUpDown;
+  }
+}
+
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_PROTO_RULE(Idle, 2)
+{
+  ButtonPinDebounce *current_button_ptr = ButtonOnKey(KEY_AF);
+
+  if (current_button_ptr->buttonState == true)
+  {
+    Serial.println(F("Idle -> Af -> TableUpDown"));
+    ((DebounceNavigate*)pI)->goOn = TableUpDown;
+    ((DebounceNavigate*)pI)->pressedButton = current_button_ptr;
+    *pstate = TableUpDown;
+  }
+}
+
+// TableToPosisie ===============================================================================================================
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_PROTO_OPEN(TableToPosisie)
+{
+  Serial.println(F("TableToPosisie"));
   HuidigeTafelPosisie = KryTafelPosisie();
   HuidigePosisie = KryGeStoordePosisie(HuidigePosisieIndex);
 
@@ -199,7 +247,7 @@ SM_MACRO_PROTO_OPEN(MoveUpDown)
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
-SM_MACRO_PROTO_STATE(MoveUpDown)
+SM_MACRO_PROTO_STATE(TableToPosisie)
 {
   unsigned long current_time = WhatIsCount(TIME_MOTOR_STEP);
 
@@ -214,17 +262,61 @@ SM_MACRO_PROTO_STATE(MoveUpDown)
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
-SM_MACRO_PROTO_RULE(MoveUpDown, 0)
+SM_MACRO_PROTO_RULE(TableToPosisie, 0)
 {
   if (StepsToTake < 1)
   {
-    Serial.println(F("MoveUpDown -> Idle"));
+    Serial.println(F("TableToPosisie -> Idle"));
     *pstate = Idle;
   }
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
-SM_MACRO_PROTO_CLOSE(MoveUpDown)
+SM_MACRO_PROTO_CLOSE(TableToPosisie)
+{
+  digitalWrite(MOTOR_ENABLE, false);
+  StoorTafelPosisie(HuidigeTafelPosisie);
+}
+
+// TableUpDown ==================================================================================================================
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_PROTO_OPEN(TableUpDown)
+{
+  Serial.println(F("TableUpDown"));
+  HuidigeTafelPosisie = KryTafelPosisie();
+
+  Motor_Step = false;
+  digitalWrite(MOTOR_DIR, StepRigting);
+  digitalWrite(MOTOR_PULSE, Motor_Step);
+  digitalWrite(MOTOR_ENABLE, true);
+}
+
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_PROTO_STATE(TableUpDown)
+{
+  unsigned long current_time = WhatIsCount(TIME_MOTOR_STEP);
+
+  if (current_time > 1)
+  {
+    HuidigeTafelPosisie +=  (StepRigting == Opwaarts) ? (1) : (-1);
+    Motor_Step = !Motor_Step;
+    digitalWrite(MOTOR_PULSE, Motor_Step);
+    StartCount(TIME_MOTOR_STEP);
+  }
+}
+
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_PROTO_RULE(TableUpDown, 0)
+{
+  if (((DebounceNavigate*)pI)->pressedButton->buttonState == false)
+  {
+    Serial.println(F("TableUpDown - > Idle"));
+    *pstate = Idle;
+  }
+}
+
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_PROTO_CLOSE(TableUpDown)
 {
   digitalWrite(MOTOR_ENABLE, false);
   StoorTafelPosisie(HuidigeTafelPosisie);
@@ -245,6 +337,53 @@ SM_MACRO_PROTO_RULE(Debounce, 0)
     *pstate = ((DebounceNavigate*)pI)->goOn;
   }
 }
+
+// HomeTafel ====================================================================================================================
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_PROTO_OPEN(HomeTafel)
+{
+  Serial.println(F("HomeTafel"));
+  StepRigting = Afwaarts;
+  Motor_Step = false;
+
+  digitalWrite(MOTOR_DIR, StepRigting);
+  digitalWrite(MOTOR_PULSE, Motor_Step);
+  digitalWrite(MOTOR_ENABLE, true);
+}
+
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_PROTO_STATE(HomeTafel)
+{
+  unsigned long current_time = WhatIsCount(TIME_MOTOR_STEP);
+
+  if (current_time > 1)
+  {
+    Motor_Step = !Motor_Step;
+    digitalWrite(MOTOR_PULSE, Motor_Step);
+    StartCount(TIME_MOTOR_STEP);
+  }
+}
+
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_PROTO_RULE(HomeTafel, 0)
+{
+  ButtonPinDebounce *current_button_ptr = ButtonOnKey(KEY_HOME);
+
+  if (current_button_ptr->buttonState == false)
+  {
+    Serial.println(F("HomeTafel - > Idle"));
+    *pstate = Idle;
+  }
+}
+
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_PROTO_CLOSE(HomeTafel)
+{
+  digitalWrite(MOTOR_ENABLE, false);
+  StoorTafelPosisie(0);
+  TafelIsHomed();
+}
+
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
