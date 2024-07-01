@@ -12,6 +12,7 @@ enum Timers
   TIME_LED_FAST,
   TIME_LED_SLOW,
   TIME_MOTOR_STEP,
+  TIME_SELECT,
   MAX_TIMERS
 };
 

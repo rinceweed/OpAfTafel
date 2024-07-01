@@ -2,9 +2,11 @@
 #include "Timer.h"
 
 //#define TIMER_RELOAD        (0xF424)
-#define TIMER_RELOAD        (0x9c4)
+// #define TIMER_RELOAD          (0x9c4)
+// #define TIME_MS               (10)
 
-#define TIME_MS             (10)
+#define TIMER_RELOAD          (16000)
+#define TIME_MS               (1)
 
 typedef struct Timing
 {
@@ -34,13 +36,11 @@ void TimerInitialise()
   TCCR1A = 0; // Reset entire TCCR1A to 0
   TCCR1B = 0; // Reset entire TCCR1B to 0
   /*2. We set the prescalar to the desired value by changing the CS10 CS12 and CS12 bits. */
-  //Set CS10 and CS11 1 so we get prescalar 64
-  //Set CS12 to 1 so we get prescalar 256
-  //Set OCIE1A/WGM12 to 1 so we enable compare match A
-  TCCR1B = (1<<WGM12) | (1<<CS11) | (1<<CS10);
+  //Set CS10 1 so we get prescalar 1
+  TCCR1B =  (1<<CS10);
   /*3. We enable compare match mode on register A*/
-  TIMSK1 = (1<<OCIE1A); 
-  /*4. Compare register A to this value to get 10ms*/
+  TIMSK1 = (1<<OCIE1A);
+  /*4. Compare register A to this value to get 1ms*/
   OCR1A = TIMER_RELOAD;
   sei();
 }
@@ -75,6 +75,7 @@ unsigned long WhatIsCount(enum Timers bt)
 ISR(TIMER1_COMPA_vect)
 {
   TCNT1 = 0; //First, set the timer back to 0 so it resets for next interrupt
+  OCR1A = TIMER_RELOAD;
 
   for (int i = 0; i < MAX_TIMERS; i++)
   {

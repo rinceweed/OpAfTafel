@@ -21,6 +21,7 @@ void TafelIsHomed();
 uint32_t KryTafelPosisie();
 void StoorTafelPosisie(uint32_t posisie);
 uint8_t KryGekosePosisieIndex();
+void StoorGekosePosisieIndex(uint8_t posisieIndex);
 uint32_t KryGeStoordePosisie(uint8_t posisieIndex);
 void StoorPosisie(uint8_t posisieIndex, uint32_t posisie);
 

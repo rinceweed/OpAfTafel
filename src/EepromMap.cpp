@@ -71,6 +71,13 @@ uint8_t KryGekosePosisieIndex()
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+void StoorGekosePosisieIndex(uint8_t posisieIndex)
+{
+  EEPROM.update(GEKOSE_POSISIE_INDEX, posisieIndex);
+  return;
+}
+
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
 uint32_t KryGeStoordePosisie(uint8_t posisieIndex)
 {
   uint32_t e;

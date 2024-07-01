@@ -62,16 +62,8 @@ void CheckButtonPress()
 void CheckButtonPress(ButtonPinDebounce *fPinIn)
 {
   // read the state of the switch into a local variable:
-  int pinAValue = analogRead(fPinIn->button);
   int pinDValue = digitalRead(fPinIn->button);
-  bool value = digitalRead(fPinIn->button) > 3 ? true : false;
-
-   Serial.print(F("Pin "));
-   Serial.print(fPinIn->button);
-   Serial.print(" :A ");
-   Serial.print(pinAValue);
-   Serial.print(" :D ");
-   Serial.println(pinDValue);
+  bool value = pinDValue > 0 ? true : false;
 
   // check to see if you just pressed the button
   // (i.e. the input went from LOW to HIGH), and you've waited long enough
