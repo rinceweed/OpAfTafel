@@ -39,6 +39,11 @@ typedef struct StateDebounceNavigate
 #define SELECT_TIMEOUT           (5) /*5s*/
 #define MOTOR_STEP_TIMEOUT       (1) /*10ms*/
 
+#define HEARTBEAT_LED            (60) /*10ms*/
+#define SLOW_SELECT_LED          (40) /*10ms*/
+#define FAST_MOTOR_STEP_LED      (20) /*10ms*/
+#define FAST_PROGRAM_STEP_LED    (10) /*10ms*/
+
 /*--[ Data ]---------------------------------------------------------------------------------------------------------------------*/
 bool LED_STATE = true;
 static uint32_t HuidigeTafelPosisie;
@@ -117,11 +122,14 @@ SM_MACRO_RULE_LIST(Done) =
 
 /*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
 SM_MACRO_PROTO_OPEN(Program);
+SM_MACRO_PROTO_STATE(Program);
 SM_MACRO_PROTO_RULE(Program, 0);
 SM_MACRO_PROTO_RULE(Program, 1);
+SM_MACRO_PROTO_RULE(Program, 2);
+SM_MACRO_PROTO_RULE(Program, 3);
 SM_MACRO_RULE_LIST(Program) =
 {
-  SM_MACRO_NAME_RULE(Program, 0), SM_MACRO_NAME_RULE(Program, 1), NULL
+  SM_MACRO_NAME_RULE(Program, 0), SM_MACRO_NAME_RULE(Program, 1), SM_MACRO_NAME_RULE(Program, 2), SM_MACRO_NAME_RULE(Program, 3), NULL
 };
 
 /*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
@@ -152,7 +160,7 @@ static Tsm_States Tafel_States[MAX_TAFEL_STATES] =
   {SM_MACRO_NAME_OPEN(TableUpDown), SM_MACRO_NAME_STATE(TableUpDown), SM_MACRO_RULES(TableUpDown), SM_MACRO_NAME_CLOSE(TableUpDown)},
   {SM_MACRO_NAME_OPEN(Debounce), NULL, SM_MACRO_RULES(Debounce), NULL},
   {SM_MACRO_NAME_OPEN(Done), SM_MACRO_NAME_STATE(Done), SM_MACRO_RULES(Done), SM_MACRO_NAME_CLOSE(Done)},
-  {SM_MACRO_NAME_OPEN(Program), NULL, SM_MACRO_RULES(Program), NULL},
+  {SM_MACRO_NAME_OPEN(Program), SM_MACRO_NAME_STATE(Program), SM_MACRO_RULES(Program), NULL},
   {SM_MACRO_NAME_OPEN(ProgramUpDown), SM_MACRO_NAME_STATE(ProgramUpDown), SM_MACRO_RULES(ProgramUpDown), SM_MACRO_NAME_CLOSE(ProgramUpDown)},
   {SM_MACRO_NAME_OPEN(HomeTafel), SM_MACRO_NAME_STATE(HomeTafel), SM_MACRO_RULES(HomeTafel), NULL}
 };
@@ -162,14 +170,19 @@ static Tsm_States Tafel_States[MAX_TAFEL_STATES] =
 void TafelBeheerInit()
 {
   ButtonInitialise();
-  ConfigureTimer(TIME_LED_SLOW, .25);
-  ConfigureTimer(TIME_LED_FAST, .125);
+  ConfigureTimer(TIME_LED_SLOW, .01);
+  ConfigureTimer(TIME_LED_FAST, .01);
   ConfigureTimer(TIME_MOTOR_STEP, .01); //10ms
   ConfigureTimer(TIME_SELECT, 1); //1s
 
   pinMode(MOTOR_PULSE, OUTPUT);
   pinMode(MOTOR_DIR, OUTPUT);
   pinMode(MOTOR_ENABLE, OUTPUT);
+
+  for (uint8_t i = 0; i < MAX_POSISIES; i++)
+  {
+    pinMode((i + LED_OFFSET), OUTPUT);
+  }
 
   uint32_t start = IsTafelHomed() == HOMED ? Idle: HomeTafel;
   
@@ -191,6 +204,7 @@ SM_MACRO_PROTO_OPEN(Idle)
   Serial.println(F("Idle"));
   HuidigeTafelPosisie = KryTafelPosisie();
   HuidigePosisieIndex = KryGekosePosisieIndex();
+  digitalWrite((HuidigePosisieIndex + LED_OFFSET), true);
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
@@ -199,7 +213,7 @@ SM_MACRO_PROTO_STATE(Idle)
   unsigned long current_time = WhatIsCount(TIME_LED_SLOW);
 
   // Should increment every BOTTLE_FLOW_TMER_MS
-  if (current_time > 2)
+  if (current_time > HEARTBEAT_LED)
   {
     LED_STATE = !LED_STATE;      //Invert LED state
     digitalWrite(13, LED_STATE);  //Write new state to the LED on pin D5
@@ -261,7 +275,7 @@ SM_MACRO_PROTO_RULE(Idle, 3)
     Serial.println(F("Idle -> Program"));
     ((DebounceNavigate*)pI)->goOn = Program;
     ((DebounceNavigate*)pI)->pressedButton = current_button_ptr;
-    *pstate = Program;
+    *pstate = Debounce;
   }
 }
 
@@ -276,7 +290,7 @@ SM_MACRO_PROTO_RULE(Idle, 4)
     ((DebounceNavigate*)pI)->goOn = SelectPosisie;
     ((DebounceNavigate*)pI)->pressedButton = current_button_ptr;
     HuidigePosisieIndex--;
-    *pstate = SelectPosisie;
+    *pstate = Debounce;
   }
 }
 
@@ -291,7 +305,7 @@ SM_MACRO_PROTO_RULE(Idle, 5)
     ((DebounceNavigate*)pI)->goOn = SelectPosisie;
     ((DebounceNavigate*)pI)->pressedButton = current_button_ptr;
     HuidigePosisieIndex++;
-    *pstate = SelectPosisie;
+    *pstate = Debounce;
   }
 }
 
@@ -301,8 +315,14 @@ SM_MACRO_PROTO_OPEN(SelectPosisie)
 {
   Serial.println(F("SelectPosisie"));
   // If very big then it was 0--
-  HuidigePosisieIndex = (HuidigePosisieIndex > (2 * MAX_POSISIES)) ? 0 : MAX_POSISIES - 1;
+  HuidigePosisieIndex = (HuidigePosisieIndex > (2 * MAX_POSISIES)) ? 0 : (HuidigePosisieIndex >= MAX_POSISIES) ? MAX_POSISIES - 1 : HuidigePosisieIndex;
+  for (uint8_t i = 0; i < MAX_POSISIES; i++)
+  {
+    digitalWrite((i + LED_OFFSET), false);
+  }
+
   StartCount(TIME_SELECT);
+  StartCount(TIME_LED_FAST);
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
@@ -311,10 +331,10 @@ SM_MACRO_PROTO_STATE(SelectPosisie)
   unsigned long current_time = WhatIsCount(TIME_LED_FAST);
 
   // Should flash the current Index LED
-  if (current_time > 2)
+  if (current_time > SLOW_SELECT_LED)
   {
     LED_STATE = !LED_STATE;      //Invert LED state
-    digitalWrite(13, LED_STATE);  //Write new state to the LED on pin D5
+    digitalWrite((HuidigePosisieIndex + LED_OFFSET), LED_STATE);  //Write new state to the LED on pin D5
     StartCount(TIME_LED_FAST);
   }
 }
@@ -329,7 +349,7 @@ SM_MACRO_PROTO_RULE(SelectPosisie, 0)
     Serial.println(F("SelectPosisie -> Idle"));
     ((DebounceNavigate*)pI)->goOn = Idle;
     ((DebounceNavigate*)pI)->pressedButton = current_button_ptr;
-    StoorGekosePosisieIndex(HuidigeTafelPosisie);
+    StoorGekosePosisieIndex(HuidigePosisieIndex);
     *pstate = Debounce;
   }
 }
@@ -384,7 +404,7 @@ SM_MACRO_PROTO_OPEN(TableToPosisie)
   HuidigeTafelPosisie = KryTafelPosisie();
   HuidigePosisie = KryGeStoordePosisie(HuidigePosisieIndex);
 
-  int steppies = HuidigeTafelPosisie - HuidigePosisie;
+  int32_t steppies = HuidigeTafelPosisie - HuidigePosisie;
   //TODO: check if not missing one step
   StepsToTake = abs(steppies);
   Motor_Step = false;
@@ -399,6 +419,7 @@ SM_MACRO_PROTO_OPEN(TableToPosisie)
   digitalWrite(MOTOR_DIR, StepRigting);
   digitalWrite(MOTOR_PULSE, Motor_Step);
   digitalWrite(MOTOR_ENABLE, true);
+  StartCount(TIME_LED_FAST);
   StartCount(TIME_MOTOR_STEP);
 }
 
@@ -414,6 +435,15 @@ SM_MACRO_PROTO_STATE(TableToPosisie)
     Motor_Step = !Motor_Step;
     digitalWrite(MOTOR_PULSE, Motor_Step);
     StartCount(TIME_MOTOR_STEP);
+  }
+  
+  current_time = WhatIsCount(TIME_LED_FAST);
+
+  if (current_time > FAST_MOTOR_STEP_LED)
+  {
+    LED_STATE = !LED_STATE;      //Invert LED state
+    digitalWrite((HuidigePosisieIndex + LED_OFFSET), LED_STATE);  //Write new state to the LED on pin D5
+    StartCount(TIME_LED_FAST);
   }
 }
 
@@ -546,7 +576,21 @@ SM_MACRO_PROTO_OPEN(Program)
 {
   Serial.println(F("Program"));
   StartCount(TIME_SELECT);
+  StartCount(TIME_LED_FAST);
   HuidigePosisieIndex = KryGekosePosisieIndex();
+}
+
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_PROTO_STATE(Program)
+{
+  unsigned long current_time = WhatIsCount(TIME_LED_FAST);
+
+  if (current_time > FAST_PROGRAM_STEP_LED)
+  {
+    LED_STATE = !LED_STATE;      //Invert LED state
+    digitalWrite((HuidigePosisieIndex + LED_OFFSET), LED_STATE);  //Write new state to the LED on pin D5
+    StartCount(TIME_LED_FAST);
+  }
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
@@ -566,6 +610,36 @@ SM_MACRO_PROTO_RULE(Program, 0)
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
 SM_MACRO_PROTO_RULE(Program, 1)
+{
+  ButtonPinDebounce *current_button_ptr = ButtonOnKey(KEY_OP);
+
+  if (current_button_ptr->buttonState == true)
+  {
+    Serial.println(F("Program -> Up -> ProgramUpDown"));
+    StepRigting = Opwaarts;
+    ((DebounceNavigate*)pI)->goOn = ProgramUpDown;
+    ((DebounceNavigate*)pI)->pressedButton = current_button_ptr;
+    *pstate = ProgramUpDown;
+  }
+}
+
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_PROTO_RULE(Program, 2)
+{
+  ButtonPinDebounce *current_button_ptr = ButtonOnKey(KEY_AF);
+
+  if (current_button_ptr->buttonState == true)
+  {
+    Serial.println(F("Program -> Af -> ProgramUpDown"));
+    StepRigting = Afwaarts;
+    ((DebounceNavigate*)pI)->goOn = ProgramUpDown;
+    ((DebounceNavigate*)pI)->pressedButton = current_button_ptr;
+    *pstate = ProgramUpDown;
+  }
+}
+
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_PROTO_RULE(Program, 3)
 {
   unsigned long current_time = WhatIsCount(TIME_SELECT);
 
@@ -597,6 +671,7 @@ SM_MACRO_PROTO_STATE(ProgramUpDown)
 
   if (current_time > MOTOR_STEP_TIMEOUT)
   {
+    HuidigeTafelPosisie += ((StepRigting == Opwaarts) ? (1) : (-1));
     Motor_Step = !Motor_Step;
     digitalWrite(MOTOR_PULSE, Motor_Step);
     StartCount(TIME_MOTOR_STEP);
