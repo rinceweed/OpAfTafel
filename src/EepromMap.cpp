@@ -22,15 +22,36 @@ void EepromMapInitialise()
   {
     EEPROM.write(KANARIE, KANARI_VALUE);
     EEPROM.write(TAFEL_HOMED, !HOMED);
-    EEPROM.write(GEKOSE_POSISIE_INDEX, 0);
-
-    EEPROM.put(TAFEL_POSISIE, 0);
+    StoorGekosePosisieIndex(0);
+    StoorTafelPosisie(0);
     
     // Make all positions the same
-    for (uint8_t i = 0; i < MAX_POSISIES; i += sizeof(uint32_t))
+    for (uint8_t i = 0; i < MAX_POSISIES; i++)
     {
-      EEPROM.put(POSISIES_BEGIN + i, 0);
+      StoorPosisie(i, 0);
     }
+  }
+  ClearMem();
+}
+
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+void ShowMem()
+{
+  for (uint8_t i = 0; i < 40; i++)
+  {
+    uint8_t e = EEPROM.read(i);
+    Serial.print(i);
+    Serial.print(F(" : "));
+    Serial.println(e);
+  }
+}
+
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+void ClearMem()
+{
+  for (uint8_t i = TAFEL_POSISIE; i < POSISIES_BEGIN; i++)
+  {
+    EEPROM[i] = 0xff;
   }
 }
 

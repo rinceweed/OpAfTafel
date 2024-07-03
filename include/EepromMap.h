@@ -25,5 +25,7 @@ void StoorGekosePosisieIndex(uint8_t posisieIndex);
 uint32_t KryGeStoordePosisie(uint8_t posisieIndex);
 void StoorPosisie(uint8_t posisieIndex, uint32_t posisie);
 
+void ShowMem();
+void ClearMem();
 /*===============================================================================================================================*/
 #endif
