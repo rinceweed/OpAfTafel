@@ -173,7 +173,7 @@ void TafelBeheerInit()
   ButtonInitialise();
   ConfigureTimer(TIME_LED_SLOW, .01);
   ConfigureTimer(TIME_LED_FAST, .01);
-  ConfigureTimer(TIME_MOTOR_STEP, .01); //10ms
+  ConfigureTimer(TIME_MOTOR_STEP, .001); //10ms
   ConfigureTimer(TIME_SELECT, 1); //1s
 
   pinMode(MOTOR_PULSE, OUTPUT);
