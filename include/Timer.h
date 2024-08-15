@@ -16,11 +16,18 @@ enum Timers
   MAX_TIMERS
 };
 
+/*! Define the template for the Open function */
+typedef void (*pTimer2)(void);
+
 /*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
 void TimerInitialise();
 void ConfigureTimer(enum Timers bt, float seconds);
 void StartCount(enum Timers bt);
 unsigned long WhatIsCount(enum Timers bt);
+void Timer2Attach(pTimer2 callBack);
+void Timer2Start();
+void Timer2Stop();
+void Timer2Ramp();
 
 /*EOF============================================================================================================================*/
 #endif

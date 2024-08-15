@@ -37,12 +37,19 @@ typedef struct StateDebounceNavigate
 
 /*--[ Constants ]----------------------------------------------------------------------------------------------------------------*/
 #define SELECT_TIMEOUT           (5) /*5s*/
-#define MOTOR_STEP_TIMEOUT       (1) /*10ms*/
+#define MOTOR_STEP_TIMEOUT       (5) /*500us*/
+
+#define PULSE_HIGH_TIME_DELAY    (20) /*us*/
+#define PULSE_MIN_TIME_DELAY     (20)/*us*/
+#define PULSE_TIME_DELAY         (70)/*us*/
 
 #define HEARTBEAT_LED            (60) /*10ms*/
 #define SLOW_SELECT_LED          (40) /*10ms*/
 #define FAST_MOTOR_STEP_LED      (20) /*10ms*/
 #define FAST_PROGRAM_STEP_LED    (10) /*10ms*/
+
+#define MOTOR_ENABLED            (false)
+#define MOTOR_DISABLED           (true)
 
 /*--[ Data ]---------------------------------------------------------------------------------------------------------------------*/
 bool LED_STATE = true;
@@ -50,11 +57,13 @@ static uint32_t HuidigeTafelPosisie;
 static uint8_t HuidigePosisieIndex;
 static uint32_t GeStoordePosisie;
 static int32_t StepsToTake;
-static bool Motor_Step;
 static TAFEL_RIGTTING StepRigting;
 
 static Tsm_SM Tafel_SM;
 static DebounceNavigate DebounceHandle;
+
+/*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
+void pulseMotorPin(void);
 
 /*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
 SM_MACRO_PROTO_OPEN(Idle);
@@ -74,6 +83,7 @@ SM_MACRO_RULE_LIST(Idle) =
 /*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
 SM_MACRO_PROTO_OPEN(SelectPosisie);
 SM_MACRO_PROTO_STATE(SelectPosisie);
+SM_MACRO_PROTO_CLOSE(SelectPosisie);
 SM_MACRO_PROTO_RULE(SelectPosisie, 0);
 SM_MACRO_PROTO_RULE(SelectPosisie, 1);
 SM_MACRO_PROTO_RULE(SelectPosisie, 2);
@@ -156,7 +166,7 @@ SM_MACRO_RULE_LIST(HomeTafel) =
 static Tsm_States Tafel_States[MAX_TAFEL_STATES] =
 {
   {SM_MACRO_NAME_OPEN(Idle), SM_MACRO_NAME_STATE(Idle), SM_MACRO_RULES(Idle), NULL},
-  {SM_MACRO_NAME_OPEN(SelectPosisie), SM_MACRO_NAME_STATE(SelectPosisie), SM_MACRO_RULES(SelectPosisie), NULL},
+  {SM_MACRO_NAME_OPEN(SelectPosisie), SM_MACRO_NAME_STATE(SelectPosisie), SM_MACRO_RULES(SelectPosisie), SM_MACRO_NAME_CLOSE(SelectPosisie)},
   {SM_MACRO_NAME_OPEN(TableToPosisie), SM_MACRO_NAME_STATE(TableToPosisie), SM_MACRO_RULES(TableToPosisie), SM_MACRO_NAME_CLOSE(TableToPosisie)},
   {SM_MACRO_NAME_OPEN(TableUpDown), SM_MACRO_NAME_STATE(TableUpDown), SM_MACRO_RULES(TableUpDown), SM_MACRO_NAME_CLOSE(TableUpDown)},
   {SM_MACRO_NAME_OPEN(Debounce), NULL, SM_MACRO_RULES(Debounce), NULL},
@@ -173,7 +183,7 @@ void TafelBeheerInit()
   ButtonInitialise();
   ConfigureTimer(TIME_LED_SLOW, .01);
   ConfigureTimer(TIME_LED_FAST, .01);
-  ConfigureTimer(TIME_MOTOR_STEP, .001); //10ms
+  ConfigureTimer(TIME_MOTOR_STEP, 0.005); //100us
   ConfigureTimer(TIME_SELECT, 1); //1s
 
   pinMode(MOTOR_PULSE, OUTPUT);
@@ -186,6 +196,7 @@ void TafelBeheerInit()
   }
 
   uint32_t start = IsTafelHomed() == HOMED ? Idle: HomeTafel;
+  Timer2Attach(pulseMotorPin);
   
   Tsm_Create(&Tafel_SM, Tafel_States, &DebounceHandle, start, MAX_TAFEL_STATES);
   return;
@@ -412,6 +423,15 @@ SM_MACRO_PROTO_RULE(SelectPosisie, 3)
   }
 }
 
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_PROTO_CLOSE(SelectPosisie)
+{
+  for (uint8_t i = 0; i < MAX_POSISIES; i++)
+  {
+    digitalWrite((i + LED_OFFSET), false);
+  }
+}
+
 // TableToPosisie ===============================================================================================================
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
 SM_MACRO_PROTO_OPEN(TableToPosisie)
@@ -423,7 +443,6 @@ SM_MACRO_PROTO_OPEN(TableToPosisie)
   int32_t steppies = GeStoordePosisie - HuidigeTafelPosisie;
   //TODO: check if not missing one step
   StepsToTake = abs(steppies);
-  Motor_Step = false;
   StepRigting = (steppies < 0) ? Afwaarts : Opwaarts;
   Serial.print(F("HuidigeTafelPosisie"));
   Serial.print(F(" : "));
@@ -444,10 +463,11 @@ SM_MACRO_PROTO_OPEN(TableToPosisie)
   Serial.print(F(" : "));
   Serial.println(StepRigting);
   digitalWrite(MOTOR_DIR, StepRigting);
-  digitalWrite(MOTOR_PULSE, Motor_Step);
-  digitalWrite(MOTOR_ENABLE, true);
+  digitalWrite(MOTOR_PULSE, LOW);
+  digitalWrite(MOTOR_ENABLE, MOTOR_ENABLED);
   StartCount(TIME_LED_FAST);
   StartCount(TIME_MOTOR_STEP);
+  Timer2Start();
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
@@ -457,11 +477,8 @@ SM_MACRO_PROTO_STATE(TableToPosisie)
 
   if (current_time > MOTOR_STEP_TIMEOUT)
   {
-    StepsToTake--;
-    HuidigeTafelPosisie += ((StepRigting == Opwaarts) ? (1) : (-1));
-    Motor_Step = !Motor_Step;
-    digitalWrite(MOTOR_PULSE, Motor_Step);
     StartCount(TIME_MOTOR_STEP);
+    Timer2Ramp();
   }
   
   current_time = WhatIsCount(TIME_LED_FAST);
@@ -487,7 +504,8 @@ SM_MACRO_PROTO_RULE(TableToPosisie, 0)
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
 SM_MACRO_PROTO_CLOSE(TableToPosisie)
 {
-  digitalWrite(MOTOR_ENABLE, false);
+  Timer2Stop();
+  digitalWrite(MOTOR_ENABLE, MOTOR_DISABLED);
   StoorTafelPosisie(HuidigeTafelPosisie);
 }
 
@@ -498,12 +516,12 @@ SM_MACRO_PROTO_OPEN(TableUpDown)
   Serial.println(F("TableUpDown"));
   HuidigeTafelPosisie = KryTafelPosisie();
   StepRigting = (((DebounceNavigate*)pI)->pressedButton->button == KEY_OP) ? Opwaarts: Afwaarts;
-  Motor_Step = false;
   digitalWrite(MOTOR_DIR, StepRigting);
-  digitalWrite(MOTOR_PULSE, Motor_Step);
-  digitalWrite(MOTOR_ENABLE, true);
+  digitalWrite(MOTOR_PULSE, LOW);
+  digitalWrite(MOTOR_ENABLE, MOTOR_ENABLED);
   StartCount(TIME_MOTOR_STEP);
   StartCount(TIME_LED_FAST);
+  Timer2Start();
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
@@ -513,10 +531,8 @@ SM_MACRO_PROTO_STATE(TableUpDown)
 
   if (current_time > MOTOR_STEP_TIMEOUT)
   {
-    HuidigeTafelPosisie += ((StepRigting == Opwaarts) ? (1) : (-1));
-    Motor_Step = !Motor_Step;
-    digitalWrite(MOTOR_PULSE, Motor_Step);
     StartCount(TIME_MOTOR_STEP);
+    Timer2Ramp();
   }
 
   current_time = WhatIsCount(TIME_LED_FAST);
@@ -542,7 +558,8 @@ SM_MACRO_PROTO_RULE(TableUpDown, 0)
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
 SM_MACRO_PROTO_CLOSE(TableUpDown)
 {
-  digitalWrite(MOTOR_ENABLE, false);
+  Timer2Stop();
+  digitalWrite(MOTOR_ENABLE, MOTOR_DISABLED);
   StoorTafelPosisie(HuidigeTafelPosisie);
 }
 
@@ -568,24 +585,16 @@ SM_MACRO_PROTO_OPEN(Done)
 {
   Serial.println(F("Done"));
   StepRigting = Opwaarts;
-  Motor_Step = false;
 
   digitalWrite(MOTOR_DIR, StepRigting);
-  digitalWrite(MOTOR_PULSE, Motor_Step);
-  digitalWrite(MOTOR_ENABLE, true);
+  digitalWrite(MOTOR_PULSE, LOW);
+  digitalWrite(MOTOR_ENABLE, MOTOR_ENABLED);
+  Timer2Start();
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
 SM_MACRO_PROTO_STATE(Done)
 {
-  unsigned long current_time = WhatIsCount(TIME_MOTOR_STEP);
-
-  if (current_time > MOTOR_STEP_TIMEOUT)
-  {
-    Motor_Step = !Motor_Step;
-    digitalWrite(MOTOR_PULSE, Motor_Step);
-    StartCount(TIME_MOTOR_STEP);
-  }
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
@@ -603,7 +612,8 @@ SM_MACRO_PROTO_RULE(Done, 0)
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
 SM_MACRO_PROTO_CLOSE(Done)
 {
-  digitalWrite(MOTOR_PULSE, false);
+  Timer2Stop();
+  digitalWrite(MOTOR_PULSE, LOW);
   StoorTafelPosisie(0);
   TafelIsHomed();
 }
@@ -696,10 +706,10 @@ SM_MACRO_PROTO_OPEN(ProgramUpDown)
   StartCount(TIME_SELECT);
   HuidigeTafelPosisie = KryTafelPosisie();
 
-  Motor_Step = false;
   digitalWrite(MOTOR_DIR, StepRigting);
-  digitalWrite(MOTOR_PULSE, Motor_Step);
-  digitalWrite(MOTOR_ENABLE, true);
+  digitalWrite(MOTOR_PULSE, LOW);
+  digitalWrite(MOTOR_ENABLE, MOTOR_ENABLED);
+  Timer2Start();
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
@@ -709,10 +719,8 @@ SM_MACRO_PROTO_STATE(ProgramUpDown)
 
   if (current_time > MOTOR_STEP_TIMEOUT)
   {
-    HuidigeTafelPosisie += ((StepRigting == Opwaarts) ? (1) : (-1));
-    Motor_Step = !Motor_Step;
-    digitalWrite(MOTOR_PULSE, Motor_Step);
     StartCount(TIME_MOTOR_STEP);
+    Timer2Ramp();
   }
 }
 
@@ -731,7 +739,8 @@ SM_MACRO_PROTO_RULE(ProgramUpDown, 0)
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
 SM_MACRO_PROTO_CLOSE(ProgramUpDown)
 {
-  digitalWrite(MOTOR_ENABLE, false);
+  Timer2Stop();
+  digitalWrite(MOTOR_ENABLE, MOTOR_DISABLED);
   StoorTafelPosisie(HuidigeTafelPosisie);
   StoorPosisie(HuidigePosisieIndex, HuidigeTafelPosisie);
 }
@@ -742,11 +751,11 @@ SM_MACRO_PROTO_OPEN(HomeTafel)
 {
   Serial.println(F("HomeTafel"));
   StepRigting = Afwaarts;
-  Motor_Step = false;
 
   digitalWrite(MOTOR_DIR, StepRigting);
-  digitalWrite(MOTOR_PULSE, Motor_Step);
-  digitalWrite(MOTOR_ENABLE, true);
+  digitalWrite(MOTOR_PULSE, LOW);
+  digitalWrite(MOTOR_ENABLE, MOTOR_ENABLED);
+  Timer2Start();
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
@@ -756,9 +765,8 @@ SM_MACRO_PROTO_STATE(HomeTafel)
 
   if (current_time > MOTOR_STEP_TIMEOUT)
   {
-    Motor_Step = !Motor_Step;
-    digitalWrite(MOTOR_PULSE, Motor_Step);
     StartCount(TIME_MOTOR_STEP);
+    Timer2Ramp();
   }
 }
 
@@ -770,6 +778,8 @@ SM_MACRO_PROTO_RULE(HomeTafel, 0)
   if (current_button_ptr->buttonState == false)
   {
     Serial.println(F("HomeTafel -> Done"));
+    Timer2Stop();
+    digitalWrite(MOTOR_ENABLE, MOTOR_DISABLED);
     *pstate = Done;
   }
 }
@@ -779,6 +789,16 @@ SM_MACRO_PROTO_RULE(HomeTafel, 0)
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
 
 /*==[ PRIVATE FUNCTIONS ]========================================================================================================*/
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+void pulseMotorPin(void)
+{
+  digitalWrite(MOTOR_PULSE, HIGH);
+  delayMicroseconds(PULSE_HIGH_TIME_DELAY);
+  digitalWrite(MOTOR_PULSE, LOW);
+  HuidigeTafelPosisie += ((StepRigting == Opwaarts) ? (1) : (-1));
+  StepsToTake--;
+}
+
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
 
 /*===============================================================================================================================*/
