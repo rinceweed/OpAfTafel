@@ -16,8 +16,8 @@ enum Timers
   MAX_TIMERS
 };
 
-/*! Define the template for the Open function */
-typedef void (*pTimer2)(void);
+/*! Define the template for the Callback function */
+typedef void (*pTimer2)(uint8_t);
 
 /*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
 void TimerInitialise();

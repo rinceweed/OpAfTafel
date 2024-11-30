@@ -13,9 +13,9 @@
 #define TIME_US               (50)
 
 #define TIMER2_PRELOAD_MAX    (199) /*prescale 64, 800us*/
-#define TIMER2_PRELOAD_MIN    (49)  /*prescale 64, 200us*/
-//#define TIMER2_PRELOAD_MIN    (34)  /*prescale 64, 200us*/ elke dan en wan stall hier
-#define TIMER2_PRELOAD_REDUCE (15)
+//#define TIMER2_PRELOAD_MIN    (84)  /*prescale 64, 200us*/
+#define TIMER2_PRELOAD_MIN    (34)  /*prescale 64, 200us*/ //elke dan en wan stall hier
+#define TIMER2_PRELOAD_REDUCE (10) //Increment speed up to MAX starting from MIN
 
 typedef struct Timing
 {
@@ -29,6 +29,7 @@ typedef struct Timing
 static volatile TimingCounters TimerCounters[MAX_TIMERS];
 static volatile pTimer2 Timer2CallBack;
 static volatile int32_t StepWidth;
+static volatile int8_t StepLevelIndicator;
 
 /*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
 void setupTimer1();
@@ -141,6 +142,8 @@ void Timer2Start()
   TCNT2 = 0;
   StepWidth = TIMER2_PRELOAD_MAX;
   OCR2A     = TIMER2_PRELOAD_MAX;
+  //Start with High, todo need enum
+  StepLevelIndicator = 1;
   // Output Compare Match A Interrupt Enable
   TIMSK2 |= (1 << OCIE2A);
   sei();
@@ -170,6 +173,8 @@ ISR(TIMER2_COMPA_vect)
   OCR2A = StepWidth;
   if (Timer2CallBack != nullptr)
   {
-    Timer2CallBack();
+    Timer2CallBack(StepLevelIndicator);
+    // Swap for next time
+    StepLevelIndicator = ( StepLevelIndicator > 0) ? 0 :  1;
   }
 }

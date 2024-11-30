@@ -63,7 +63,8 @@ static Tsm_SM Tafel_SM;
 static DebounceNavigate DebounceHandle;
 
 /*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
-void pulseMotorPin(void);
+void pulseMotorPin(uint8_t ival);
+//void pulseMotorPin(void);
 
 /*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
 SM_MACRO_PROTO_OPEN(Idle);
@@ -790,13 +791,18 @@ SM_MACRO_PROTO_RULE(HomeTafel, 0)
 
 /*==[ PRIVATE FUNCTIONS ]========================================================================================================*/
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
-void pulseMotorPin(void)
+void pulseMotorPin(uint8_t ival)
 {
-  digitalWrite(MOTOR_PULSE, HIGH);
-  delayMicroseconds(PULSE_HIGH_TIME_DELAY);
-  digitalWrite(MOTOR_PULSE, LOW);
-  HuidigeTafelPosisie += ((StepRigting == Opwaarts) ? (1) : (-1));
-  StepsToTake--;
+  uint8_t level = (ival > 0) ? HIGH : LOW;
+  digitalWrite(MOTOR_PULSE, level);
+  // delayMicroseconds(PULSE_HIGH_TIME_DELAY);
+  // digitalWrite(MOTOR_PULSE, LOW);
+  //Assume it starts with HIIGH, and only on low the count gets decremented
+  if (level == LOW)
+  {
+    HuidigeTafelPosisie += ((StepRigting == Opwaarts) ? (1) : (-1));
+    StepsToTake--;
+  }
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
