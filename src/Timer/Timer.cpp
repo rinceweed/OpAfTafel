@@ -14,7 +14,7 @@
 
 #define TIMER2_PRELOAD_MAX    (199) /*prescale 64, 800us*/
 //#define TIMER2_PRELOAD_MIN    (84)  /*prescale 64, 200us*/
-#define TIMER2_PRELOAD_MIN    (34)  /*prescale 64, 200us*/ //elke dan en wan stall hier
+#define TIMER2_PRELOAD_MIN    (79)  /*prescale 64, 200us*/ //elke dan en wan stall hier
 #define TIMER2_PRELOAD_REDUCE (10) //Increment speed up to MAX starting from MIN
 
 typedef struct Timing
