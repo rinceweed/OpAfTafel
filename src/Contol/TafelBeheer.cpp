@@ -99,9 +99,10 @@ SM_MACRO_PROTO_OPEN(TableToPosisie);
 SM_MACRO_PROTO_STATE(TableToPosisie);
 SM_MACRO_PROTO_CLOSE(TableToPosisie);
 SM_MACRO_PROTO_RULE(TableToPosisie, 0);
+SM_MACRO_PROTO_RULE(TableToPosisie, 1);
 SM_MACRO_RULE_LIST(TableToPosisie) =
 {
-  SM_MACRO_NAME_RULE(TableToPosisie, 0), NULL
+  SM_MACRO_NAME_RULE(TableToPosisie, 0), SM_MACRO_NAME_RULE(TableToPosisie, 1), NULL
 };
 
 /*--[ Prototypes ]---------------------------------------------------------------------------------------------------------------*/
@@ -503,6 +504,21 @@ SM_MACRO_PROTO_RULE(TableToPosisie, 0)
 }
 
 /*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
+SM_MACRO_PROTO_RULE(TableToPosisie, 1)
+{
+  // Do Nothing go back
+  ButtonPinDebounce *current_button_ptr = ButtonOnKey(KEY_IN);
+
+  if (current_button_ptr->buttonState == true)
+  {
+    Serial.println(F("TableToPosisie -> In -> Idle"));
+    ((DebounceNavigate*)pI)->goOn = Idle;
+    ((DebounceNavigate*)pI)->pressedButton = current_button_ptr;
+    *pstate = Debounce;
+  }
+}
+
+/*--[ Function ]-----------------------------------------------------------------------------------------------------------------*/
 SM_MACRO_PROTO_CLOSE(TableToPosisie)
 {
   Timer2Stop();
@@ -604,7 +620,7 @@ SM_MACRO_PROTO_RULE(Done, 0)
   ButtonPinDebounce *current_button_ptr = ButtonOnKey(KEY_HOME);
 
   //Go up until switch is disabled
-  if (current_button_ptr->buttonState == true)
+  if (current_button_ptr->buttonState == false)
   {
     *pstate = Idle;
   }
@@ -776,7 +792,7 @@ SM_MACRO_PROTO_RULE(HomeTafel, 0)
 {
   ButtonPinDebounce *current_button_ptr = ButtonOnKey(KEY_HOME);
 
-  if (current_button_ptr->buttonState == false)
+  if (current_button_ptr->buttonState == true)
   {
     Serial.println(F("HomeTafel -> Done"));
     Timer2Stop();
